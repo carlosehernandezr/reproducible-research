@@ -15,7 +15,6 @@ So in this data analysis we will focus on answering the following two questions:
  2. Across the United States, which types of events have the greatest economic consequences?
 
 To answer these questions we will explore the US National Oceanic and Atmospheric Administration (NOAA) storm database. This database tracks the characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of deaths, injuries, and property damage.
-The basic goal of this project is to explore the NOAA Storm Database and answer some basic questions about severe weather events.
 
 ## Final Report
 
