@@ -1,0 +1,200 @@
+---
+title: "Relationship between storms and other severe weather events and the economic and public health problems of communities in the United States"
+author: "Carlos Hernández"
+date: "17/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{r message=FALSE }
+# libraries
+library(ggplot2)
+library(dplyr)
+library(ggpubr)
+
+Sys.setlocale("LC_ALL","English") # set English as locale if necessary
+options(scipen=999)  # turn-off scientific notation like 1e+48
+```
+
+## Sypnosis
+
+Storms and other severe weather events can cause economic and public health problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes as much as possible is a key concern.
+
+That is why we believe that it's of great importance to know which of these events are that cause the greatest economic and health damage in the communities.
+
+So in this data analysis we will focus on answering the following two questions:
+
+  1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+ 
+  2. Across the United States, which types of events have the greatest economic consequences?
+  
+To answer these questions we will explore the US National Oceanic and Atmospheric Administration (NOAA) storm database. This database tracks the characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of deaths, injuries, and property damage.
+
+## Data Processing
+
+The data come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. You can download the file here:
+
+ - [Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) [47Mb]
+ 
+There is also some documentation of the database available. Here you will find how some of the variables are constructed/defined.
+
+ - National Weather Service [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+ - National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
+
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+In the follow lines of code we download the data automatically into a folder called 'dataset' with the name of *FstormData.csv.bz2*.
+
+```{r message=FALSE}
+# create 'dataset' folder if not exists
+if(!dir.exists("./dataset")){
+    dir.create("./dataset")
+}
+#download the file into 'dataset' folder if not exists
+if(!file.exists("./dataset/FStormData.csv.bz2")){
+  download.file(url = "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+                ,destfile = "./dataset/FStormData.csv.bz2")
+}
+
+```
+
+Now we can load the data into a variable.
+
+```{r}
+# read the csv file (this can take a few seconds)
+storm.data <- read.csv("./dataset/FStormData.csv.bz2")
+```
+
+Fact this, now we can look at a summary of the data.
+
+```{r}
+str(storm.data)
+```
+We can see that the data contains 902297 rows and 37 variables and are very well formatted, here I have an unique consideration, and is that PROPDMG and CROPDMG variables are expressed in units of type K (Thousands), M (Millions) and B (Billions) , as we can see in PROPDMGEXP and CROPDMGEXP variables. I think that the best choice is convert this values to its real value (ex. 1K = 1000).
+
+Well, we can get this very quickly by writing a simple function to do it for us.
+
+```{r}
+
+as.usd.dollar <- function(value, exp){
+  if(exp == "K"){
+    return(value*1000)
+  }else if(exp=="M"){
+    return(value*1000000)
+  }else if(exp =="B"){
+    return(value*1000000000)
+  }else{
+    return(value)
+  }
+}
+
+damage <- select(storm.data, EVTYPE, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP, FATALITIES, INJURIES)
+damage <- mutate(damage, PROPDMG.USD = as.usd.dollar(PROPDMG, PROPDMGEXP))
+damage <- mutate(damage, CROPDMG.USD = as.usd.dollar(CROPDMG, CROPDMGEXP))
+
+# remove unused variables for a data set more clean
+damage <- select(damage, EVTYPE, PROPDMG.USD, CROPDMG.USD, FATALITIES, INJURIES)
+
+```
+
+That is all, now we have a new data set with correct units and only the variables required.
+
+```{r}
+str(damage)
+```
+Additionally we can need create some new data groups.
+
+For fatalities:
+
+```{r message = FALSE}
+fatalities <- damage %>% group_by(EVTYPE) %>% summarise(Count = sum(FATALITIES))
+fatalities <- fatalities[fatalities$Count > 150,]
+```
+
+For injuries:
+
+```{r message = FALSE}
+injuries <- damage %>% group_by(EVTYPE) %>% summarise(Count = sum(INJURIES))
+injuries <- injuries[injuries$Count > 1000,]
+```
+
+For property damage:
+
+```{r message = FALSE}
+prop <- damage %>% group_by(EVTYPE) %>% summarise(Count = sum(PROPDMG.USD))
+prop <- prop[prop$Count > 20000000,]
+```
+
+And finally for Crop damage:
+
+```{r message = FALSE}
+crop <- damage %>% group_by(EVTYPE) %>% summarise(Count = sum(CROPDMG.USD))
+crop <- crop[crop$Count > 5000,]
+```
+
+## Results
+
+### Across the United States, which types of events are most harmful with respect to population health?
+
+```{r fig.height=5, fig.width=12}
+fatalities.plot <- ggplot(fatalities) + 
+  geom_col(aes(x=fatalities$EVTYPE, y=fatalities$Count, fill = EVTYPE)) + 
+  xlab("") +
+  ylab("Fatalities") +
+  ggtitle("Fatalities by Event Type (greater than 150)") +
+  coord_flip() +
+  theme(legend.position = "none")
+
+injuries.plot <- ggplot(injuries) + 
+  geom_col(aes(x=injuries$EVTYPE, y=injuries$Count, fill = EVTYPE)) + 
+  xlab("") +
+  ylab("Injuries") +
+  ggtitle("Injuries by Event Type (greater than 1000)") +
+  coord_flip() +
+  theme(legend.position = "none")
+
+ggarrange(fatalities.plot, injuries.plot, ncol = 2, nrow = 1)
+
+```
+
+In the previous graphs, we have a very clear vision of the types of events that most harm the health of the population.
+
+Among the most fatal we find the Tornado, Excessive Heat, Flash Flood, Heat and Lighting. Also, among the causes of more injuries are the Tornado, TSTM wind, Flood, Heat and Lighting.
+
+### Across the United States, which types of events have the greatest economic consequences?
+
+```{r fig.height=5, fig.width=12}
+  
+prop.plot <- ggplot(prop) + 
+  geom_col(aes(x=prop$EVTYPE, y=prop$Count, fill = EVTYPE)) + 
+  xlab("") +
+  ggtitle("Property Damage by Event Type (greater than 20M)") +
+  ylab("Damage Cost (USD)") +
+  coord_flip() +
+  theme(legend.position = "none")
+
+crop.plot <- ggplot(crop) + 
+  geom_col(aes(x=crop$EVTYPE, y=crop$Count, fill = EVTYPE)) + 
+  xlab("") +
+  ggtitle("Crop Damage by Event Type (greater than 5000)") +
+  ylab("Damage Cost (USD)") +
+  coord_flip() +
+  theme(legend.position = "none")
+  
+  
+  ggarrange(prop.plot, crop.plot, ncol = 2, nrow = 1)
+```
+
+In the graphs above we can see the most expensive events for the communities compared to their cost in US dollars. On the right we have the costs for property damage and on the left we have the costs for crop damage.
+
+Among the most costly for property damage are the Tornado, Excessive Heat, Flash Flood, Storm Winds, Flood and Storm Wind. On the other hand, among the most expensive for damage to crops we have the Hail, Flash Flood, Flood, TSTM wind and Tornado.
+
+## Enviroment
+```{r}
+#Environment specifications
+sessionInfo()
+```
+
