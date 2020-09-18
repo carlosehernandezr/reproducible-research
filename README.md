@@ -2,7 +2,7 @@
 
 The basic goal of this project is to explore the NOAA Storm Database and answer some basic questions about severe weather events.
 
-## Sypnosis
+## Introduction
 
 Storms and other severe weather events can cause economic and public health problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes as much as possible is a key concern.
 
